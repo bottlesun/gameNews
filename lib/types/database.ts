@@ -9,4 +9,4 @@ export interface Post {
   created_at: string;
 }
 
-export type Category = "Dev" | "Business" | "Tech" | "Release" | "Esports";
+export type Category = "Game Developer" | "GamesIndustry.biz" | "Polygon";

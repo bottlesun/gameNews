@@ -26,17 +26,17 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 RSS_FEEDS = [
     {
         "url": "https://www.gamedeveloper.com/rss.xml",
-        "category": "Dev",
+        "category": "Game Developer",
         "name": "Game Developer"
     },
     {
         "url": "https://www.gamesindustry.biz/feed",
-        "category": "Business",
+        "category": "GamesIndustry.biz",
         "name": "GamesIndustry.biz"
     },
     {
         "url": "https://www.polygon.com/rss/index.xml",
-        "category": "Tech",
+        "category": "Polygon",
         "name": "Polygon"
     },
 ]
@@ -58,24 +58,6 @@ def clean_summary(text: str, max_length: int = 300) -> str:
         text = text[:max_length] + "..."
     
     return text
-
-def categorize_entry(entry: dict, default_category: str) -> str:
-    """뉴스 항목의 카테고리를 결정합니다."""
-    title = entry.get('title', '').lower()
-    summary = entry.get('summary', '').lower()
-    content = title + ' ' + summary
-    
-    # 키워드 기반 카테고리 분류
-    if any(word in content for word in ['esports', 'tournament', 'championship', 'league']):
-        return 'Esports'
-    elif any(word in content for word in ['release', 'launch', 'announced', 'reveal']):
-        return 'Release'
-    elif any(word in content for word in ['unity', 'unreal', 'engine', 'tool', 'sdk', 'api']):
-        return 'Tech'
-    elif any(word in content for word in ['business', 'revenue', 'sales', 'market', 'investment']):
-        return 'Business'
-    else:
-        return default_category
 
 def fetch_and_store_news():
     """RSS 피드에서 뉴스를 가져와 Supabase에 저장합니다."""
@@ -103,8 +85,8 @@ def fetch_and_store_news():
                         print(f"  ⏭️  Skipping entry without link: {title}")
                         continue
                     
-                    # 카테고리 결정
-                    category = categorize_entry(entry, feed_info['category'])
+                    # 카테고리는 RSS 피드 출처 사용
+                    category = feed_info['category']
                     
                     # 중복 확인 (같은 링크가 이미 있는지)
                     existing = supabase.table('posts').select('id').eq('original_link', link).execute()
