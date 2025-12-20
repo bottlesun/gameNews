@@ -1,10 +1,18 @@
 -- 게임 뉴스 애그리게이터 데이터베이스 스키마 (단순화 버전)
 -- Supabase SQL Editor에서 실행하세요
+-- 여러 번 실행해도 안전합니다 (멱등성)
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Posts 테이블
+-- 기존 정책 삭제 (있다면)
+DROP POLICY IF EXISTS "Posts are viewable by everyone" ON posts;
+DROP POLICY IF EXISTS "Authenticated users can insert posts" ON posts;
+
+-- 기존 테이블 삭제 (있다면) - 주의: 데이터가 삭제됩니다!
+-- DROP TABLE IF EXISTS posts CASCADE;
+
+-- Posts 테이블 생성 (없을 때만)
 CREATE TABLE IF NOT EXISTS posts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title TEXT NOT NULL,
@@ -32,6 +40,9 @@ CREATE POLICY "Authenticated users can insert posts"
   WITH CHECK (auth.role() = 'authenticated');
 
 -- 샘플 데이터 삽입 (테스트용)
+-- 이미 데이터가 있으면 충돌이 발생하므로 주석 처리
+-- 필요시 주석을 해제하고 실행하세요
+/*
 INSERT INTO posts (title, summary, category, original_link) VALUES
   (
     'Unity 6 정식 출시',
@@ -63,3 +74,4 @@ INSERT INTO posts (title, summary, category, original_link) VALUES
     'Esports',
     'https://lolesports.com/worlds-2024'
   );
+*/
