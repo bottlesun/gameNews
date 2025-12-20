@@ -8,6 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 기존 정책 삭제 (있다면)
 DROP POLICY IF EXISTS "Posts are viewable by everyone" ON posts;
 DROP POLICY IF EXISTS "Authenticated users can insert posts" ON posts;
+DROP POLICY IF EXISTS "Anyone can insert posts" ON posts;
 
 -- 기존 테이블 삭제 (있다면) - 주의: 데이터가 삭제됩니다!
 -- DROP TABLE IF EXISTS posts CASCADE;
@@ -34,7 +35,8 @@ CREATE POLICY "Posts are viewable by everyone"
   ON posts FOR SELECT
   USING (true);
 
--- Posts 정책: 인증된 사용자만 삽입 가능 (크롤러용)
+-- Posts 정책: 인증된 사용자만 삽입 가능
+-- service_role 키를 사용하면 이 정책을 우회합니다
 CREATE POLICY "Authenticated users can insert posts"
   ON posts FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
