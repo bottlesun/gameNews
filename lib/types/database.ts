@@ -6,19 +6,7 @@ export interface Post {
   summary: string;
   original_link: string;
   category: string;
-  view_count: number;
   created_at: string;
-}
-
-export interface Upvote {
-  user_id: string;
-  post_id: string;
-  created_at: string;
-}
-
-export interface PostWithUpvotes extends Post {
-  upvote_count: number;
-  user_has_upvoted: boolean;
 }
 
 export type Category = "Dev" | "Business" | "Tech" | "Release" | "Esports";

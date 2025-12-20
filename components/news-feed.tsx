@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { PostCard } from "@/components/post-card";
-import { PostWithUpvotes, Post } from "@/lib/types/database";
+import { Post } from "@/lib/types/database";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 export function NewsFeed() {
-  const [posts, setPosts] = useState<PostWithUpvotes[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,11 +29,6 @@ export function NewsFeed() {
 
     async function fetchPosts() {
       try {
-        // 현재 사용자 확인
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
         // 포스트 가져오기
         const { data: postsData, error: postsError } = await supabase
           .from("posts")
@@ -42,37 +37,7 @@ export function NewsFeed() {
 
         if (postsError) throw postsError;
 
-        // 각 포스트의 업보트 수 가져오기
-        const postsWithUpvotes: PostWithUpvotes[] = await Promise.all(
-          (postsData || []).map(async (post: Post) => {
-            // 업보트 수 계산
-            const { count } = await supabase
-              .from("upvotes")
-              .select("*", { count: "exact", head: true })
-              .eq("post_id", post.id);
-
-            // 사용자가 업보트했는지 확인
-            let userHasUpvoted = false;
-            if (user) {
-              const { data: upvoteData } = await supabase
-                .from("upvotes")
-                .select("*")
-                .eq("post_id", post.id)
-                .eq("user_id", user.id)
-                .single();
-
-              userHasUpvoted = !!upvoteData;
-            }
-
-            return {
-              ...post,
-              upvote_count: count || 0,
-              user_has_upvoted: userHasUpvoted,
-            };
-          })
-        );
-
-        setPosts(postsWithUpvotes);
+        setPosts(postsData || []);
       } catch (err) {
         console.error("포스트 로딩 오류:", err);
         setError("포스트를 불러오는 중 오류가 발생했습니다.");
@@ -82,7 +47,7 @@ export function NewsFeed() {
     }
 
     fetchPosts();
-  }, []);
+  }, [hasSupabaseConfig]);
 
   if (loading) {
     return (

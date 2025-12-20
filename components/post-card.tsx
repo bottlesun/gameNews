@@ -1,21 +1,14 @@
 "use client";
 
-import { ExternalLink, MessageSquare, Eye } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
+import { ExternalLink } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { UpvoteButton } from "@/components/upvote-button";
-import { PostWithUpvotes } from "@/lib/types/database";
+import { Post } from "@/lib/types/database";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
 
 interface PostCardProps {
-  post: PostWithUpvotes;
+  post: Post;
 }
 
 const categoryColors: Record<string, string> = {
@@ -60,37 +53,12 @@ export function PostCard({ post }: PostCardProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="pb-3">
-        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+      <CardContent className="pb-4">
+        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mb-3">
           {post.summary}
         </p>
+        <time className="text-xs text-muted-foreground">{timeAgo}</time>
       </CardContent>
-
-      <Separator />
-
-      <CardFooter className="pt-3 pb-3">
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-4">
-            <UpvoteButton
-              postId={post.id}
-              initialCount={post.upvote_count}
-              initialUpvoted={post.user_has_upvoted}
-            />
-
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <MessageSquare className="h-4 w-4" />
-              <span>0</span>
-            </div>
-
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Eye className="h-4 w-4" />
-              <span>{post.view_count.toLocaleString()}</span>
-            </div>
-          </div>
-
-          <time className="text-xs text-muted-foreground">{timeAgo}</time>
-        </div>
-      </CardFooter>
     </Card>
   );
 }

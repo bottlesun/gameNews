@@ -14,7 +14,6 @@
 ## 주요 기능
 
 - ✅ 뉴스 피드 (최신순 정렬)
-- ✅ 업보트 기능 (인증 필요)
 - ✅ 카테고리 배지 (Dev, Business, Tech, Release, Esports)
 - ✅ 외부 링크 (새 탭에서 열기)
 - ✅ 다크 모드 지원
@@ -64,8 +63,7 @@ gameNews/
 ├── components/            # React 컴포넌트
 │   ├── ui/               # shadcn/ui 컴포넌트
 │   ├── news-feed.tsx     # 뉴스 피드 컴포넌트
-│   ├── post-card.tsx     # 포스트 카드 컴포넌트
-│   └── upvote-button.tsx # 업보트 버튼 컴포넌트
+│   └── post-card.tsx     # 포스트 카드 컴포넌트
 ├── lib/                   # 유틸리티 및 설정
 │   ├── supabase/         # Supabase 클라이언트
 │   ├── types/            # TypeScript 타입 정의
@@ -85,16 +83,7 @@ gameNews/
 | summary       | TEXT        | 3줄 요약  |
 | original_link | TEXT        | 원본 링크 |
 | category      | TEXT        | 카테고리  |
-| view_count    | INTEGER     | 조회수    |
 | created_at    | TIMESTAMPTZ | 생성 시간 |
-
-### Upvotes 테이블
-
-| 컬럼       | 타입        | 설명           |
-| ---------- | ----------- | -------------- |
-| user_id    | UUID        | 사용자 ID (FK) |
-| post_id    | UUID        | 포스트 ID (FK) |
-| created_at | TIMESTAMPTZ | 생성 시간      |
 
 ## 배포
 
@@ -109,12 +98,10 @@ gameNews/
 
 ## 향후 개발 계획
 
-- [ ] 댓글 기능
-- [ ] 사용자 프로필
 - [ ] 검색 및 필터링
 - [ ] 페이지네이션
 - [ ] 실시간 업데이트 (Supabase Realtime)
-- [ ] 소셜 로그인 (Google, GitHub)
+- [ ] 포스트 제출 기능
 
 ## 라이선스
 
