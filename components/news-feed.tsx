@@ -6,7 +6,11 @@ import { Post } from "@/lib/types/database";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
-export function NewsFeed() {
+interface NewsFeedProps {
+  category?: string | null;
+}
+
+export function NewsFeed({ category }: NewsFeedProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,11 +33,20 @@ export function NewsFeed() {
 
     async function fetchPosts() {
       try {
-        // 포스트 가져오기
-        const { data: postsData, error: postsError } = await supabase
+        setLoading(true);
+
+        // Build query
+        let query = supabase
           .from("posts")
           .select("*")
           .order("created_at", { ascending: false });
+
+        // Apply category filter if provided
+        if (category && category !== "all") {
+          query = query.eq("category", category);
+        }
+
+        const { data: postsData, error: postsError } = await query;
 
         if (postsError) throw postsError;
 
@@ -47,7 +60,7 @@ export function NewsFeed() {
     }
 
     fetchPosts();
-  }, [hasSupabaseConfig]);
+  }, [hasSupabaseConfig, category]);
 
   if (loading) {
     return (
