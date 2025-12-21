@@ -27,6 +27,10 @@ export default function AdminReviewPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
   // Check if already authenticated
   useEffect(() => {
     const auth = sessionStorage.getItem("admin_auth");
@@ -45,6 +49,7 @@ export default function AdminReviewPage() {
   // Clear selection when filter changes
   useEffect(() => {
     setSelectedIds(new Set());
+    setCurrentPage(1); // Reset to page 1 when filter changes
   }, [filter]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -279,18 +284,89 @@ export default function AdminReviewPage() {
             <p className="text-muted-foreground">검수할 뉴스가 없습니다</p>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {posts.map((post) => (
-              <PendingPostCard
-                key={post.id}
-                post={post}
-                onUpdate={fetchPosts}
-                isSelected={selectedIds.has(post.id)}
-                onSelect={handleSelect}
-                showCheckbox={filter === "pending"}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-4">
+              {posts
+                .slice(
+                  (currentPage - 1) * itemsPerPage,
+                  currentPage * itemsPerPage
+                )
+                .map((post) => (
+                  <PendingPostCard
+                    key={post.id}
+                    post={post}
+                    onUpdate={fetchPosts}
+                    isSelected={selectedIds.has(post.id)}
+                    onSelect={handleSelect}
+                    showCheckbox={filter === "pending"}
+                  />
+                ))}
+            </div>
+
+            {/* Pagination */}
+            {posts.length > itemsPerPage && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  이전
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from(
+                    { length: Math.ceil(posts.length / itemsPerPage) },
+                    (_, i) => i + 1
+                  )
+                    .filter((page) => {
+                      const totalPages = Math.ceil(posts.length / itemsPerPage);
+                      // Show first page, last page, current page, and pages around current
+                      return (
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(page - currentPage) <= 1
+                      );
+                    })
+                    .map((page, index, array) => (
+                      <div key={page} className="flex items-center">
+                        {index > 0 && array[index - 1] !== page - 1 && (
+                          <span className="px-2 text-muted-foreground">
+                            ...
+                          </span>
+                        )}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                            currentPage === page
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted hover:bg-muted/80"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) =>
+                      Math.min(Math.ceil(posts.length / itemsPerPage), prev + 1)
+                    )
+                  }
+                  disabled={
+                    currentPage === Math.ceil(posts.length / itemsPerPage)
+                  }
+                  className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  다음
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

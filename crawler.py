@@ -103,7 +103,7 @@ def fetch_and_store_news():
             if feed.bozo:
                 print(f"⚠️  Warning: Feed parsing error for {feed_info['name']}")
             
-            for entry in feed.entries:  # 모든 엔트리 처리
+            for entry in feed.entries[:10]:  # 최근 10개만 가져오기
                 try:
                     # 원본 데이터 추출
                     raw_title = entry.get('title', 'No Title')

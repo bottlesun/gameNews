@@ -13,6 +13,9 @@ interface NewsFeedProps {
 export function NewsFeed({ category }: NewsFeedProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [error, setError] = useState<string | null>(null);
 
   // Supabase 환경 변수 확인
@@ -62,6 +65,11 @@ export function NewsFeed({ category }: NewsFeedProps) {
     fetchPosts();
   }, [hasSupabaseConfig, category]);
 
+  // Reset to page 1 when category changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [category]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -87,10 +95,71 @@ export function NewsFeed({ category }: NewsFeedProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
-    </div>
+    <>
+      <div className="space-y-4">
+        {posts
+          .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+          .map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+      </div>
+
+      {/* Pagination */}
+      {posts.length > itemsPerPage && (
+        <div className="flex items-center justify-center gap-2 mt-8">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            이전
+          </button>
+
+          <div className="flex items-center gap-1">
+            {Array.from(
+              { length: Math.ceil(posts.length / itemsPerPage) },
+              (_, i) => i + 1
+            )
+              .filter((page) => {
+                const totalPages = Math.ceil(posts.length / itemsPerPage);
+                return (
+                  page === 1 ||
+                  page === totalPages ||
+                  Math.abs(page - currentPage) <= 1
+                );
+              })
+              .map((page, index, array) => (
+                <div key={page} className="flex items-center">
+                  {index > 0 && array[index - 1] !== page - 1 && (
+                    <span className="px-2 text-muted-foreground">...</span>
+                  )}
+                  <button
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                      currentPage === page
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted hover:bg-muted/80"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                </div>
+              ))}
+          </div>
+
+          <button
+            onClick={() =>
+              setCurrentPage((prev) =>
+                Math.min(Math.ceil(posts.length / itemsPerPage), prev + 1)
+              )
+            }
+            disabled={currentPage === Math.ceil(posts.length / itemsPerPage)}
+            className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            다음
+          </button>
+        </div>
+      )}
+    </>
   );
 }
