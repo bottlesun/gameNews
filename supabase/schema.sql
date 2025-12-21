@@ -82,11 +82,6 @@ INSERT INTO posts (title, summary, category, original_link) VALUES
 -- Posts Pending 테이블 (검수 대기 뉴스)
 -- ============================================
 
--- 기존 정책 삭제 (있다면)
-DROP POLICY IF EXISTS "Pending posts are viewable by everyone" ON posts_pending;
-DROP POLICY IF EXISTS "Authenticated users can insert pending posts" ON posts_pending;
-DROP POLICY IF EXISTS "Authenticated users can update pending posts" ON posts_pending;
-
 -- Posts Pending 테이블 생성 (없을 때만)
 CREATE TABLE IF NOT EXISTS posts_pending (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -101,6 +96,11 @@ CREATE TABLE IF NOT EXISTS posts_pending (
   reviewed_at TIMESTAMPTZ,
   review_note TEXT
 );
+
+-- 기존 정책 삭제 (테이블이 생성된 후에 실행)
+DROP POLICY IF EXISTS "Pending posts are viewable by everyone" ON posts_pending;
+DROP POLICY IF EXISTS "Authenticated users can insert pending posts" ON posts_pending;
+DROP POLICY IF EXISTS "Authenticated users can update pending posts" ON posts_pending;
 
 -- 인덱스 생성 (성능 최적화)
 CREATE INDEX IF NOT EXISTS idx_posts_pending_status ON posts_pending(status);
