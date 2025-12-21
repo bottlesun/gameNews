@@ -17,9 +17,18 @@ interface PendingPost {
 interface PendingPostCardProps {
   post: PendingPost;
   onUpdate: () => void;
+  isSelected?: boolean;
+  onSelect?: (id: string, selected: boolean) => void;
+  showCheckbox?: boolean;
 }
 
-export function PendingPostCard({ post, onUpdate }: PendingPostCardProps) {
+export function PendingPostCard({
+  post,
+  onUpdate,
+  isSelected = false,
+  onSelect,
+  showCheckbox = false,
+}: PendingPostCardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleApprove = async () => {
@@ -73,64 +82,87 @@ export function PendingPostCard({ post, onUpdate }: PendingPostCardProps) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
-      <div className="flex items-start justify-between gap-4 mb-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`px-2 py-1 rounded text-xs font-medium border ${getCategoryColor(
-              post.category
-            )}`}
-          >
-            {post.category}
-          </span>
-          {getStatusBadge(post.status)}
-        </div>
-        <a
-          href={post.original_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-primary transition-colors"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      </div>
-
-      <h3 className="font-semibold text-lg mb-2 line-clamp-2">{post.title}</h3>
-      <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-        {post.summary}
-      </p>
-
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {new Date(post.created_at).toLocaleDateString("ko-KR", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
-
-        {post.status === "pending" && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleApprove}
-              disabled={isProcessing}
-              className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Check className="h-4 w-4" />
-              승인
-            </button>
-            <button
-              onClick={handleReject}
-              disabled={isProcessing}
-              className="flex items-center gap-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <X className="h-4 w-4" />
-              거부
-            </button>
+    <div
+      className={`bg-card border rounded-lg p-4 hover:border-primary/50 transition-colors ${
+        isSelected ? "border-primary ring-2 ring-primary/20" : "border-border"
+      }`}
+    >
+      <div className="flex items-start gap-4">
+        {/* Checkbox */}
+        {showCheckbox && post.status === "pending" && onSelect && (
+          <div className="pt-1">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) => onSelect(post.id, e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0"
+            />
           </div>
         )}
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className={`px-2 py-1 rounded text-xs font-medium border ${getCategoryColor(
+                  post.category
+                )}`}
+              >
+                {post.category}
+              </span>
+              {getStatusBadge(post.status)}
+            </div>
+            <a
+              href={post.original_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+
+          <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+            {post.title}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+            {post.summary}
+          </p>
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {new Date(post.created_at).toLocaleDateString("ko-KR", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+
+            {post.status === "pending" && !showCheckbox && (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleApprove}
+                  disabled={isProcessing}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Check className="h-4 w-4" />
+                  승인
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={isProcessing}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <X className="h-4 w-4" />
+                  거부
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

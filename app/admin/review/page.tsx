@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PendingPostCard } from "@/components/admin/pending-post-card";
-import { Loader2, Lock } from "lucide-react";
+import { bulkApprove } from "@/lib/actions/review-actions";
+import { Loader2, Lock, CheckSquare, Square } from "lucide-react";
 
 interface PendingPost {
   id: string;
@@ -23,6 +24,8 @@ export default function AdminReviewPage() {
   const [filter, setFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
   >("pending");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   // Check if already authenticated
   useEffect(() => {
@@ -38,6 +41,11 @@ export default function AdminReviewPage() {
       fetchPosts();
     }
   }, [isAuthenticated, filter]);
+
+  // Clear selection when filter changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filter]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +91,53 @@ export default function AdminReviewPage() {
     sessionStorage.removeItem("admin_auth");
     setPassword("");
   };
+
+  const handleSelect = (id: string, selected: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (selected) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    const pendingPosts = posts.filter((p) => p.status === "pending");
+    if (selectedIds.size === pendingPosts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingPosts.map((p) => p.id)));
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) {
+      alert("승인할 항목을 선택해주세요");
+      return;
+    }
+
+    if (!confirm(`선택한 ${selectedIds.size}개의 항목을 승인하시겠습니까?`)) {
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    const result = await bulkApprove(Array.from(selectedIds));
+
+    if (result.success) {
+      alert(`${result.count}개 항목이 승인되었습니다`);
+      setSelectedIds(new Set());
+      await fetchPosts();
+    } else {
+      alert(`승인 실패: ${result.error}`);
+    }
+
+    setIsBulkProcessing(false);
+  };
+
+  const pendingPosts = posts.filter((p) => p.status === "pending");
+  const allSelected =
+    pendingPosts.length > 0 && selectedIds.size === pendingPosts.length;
 
   // Login form
   if (!isAuthenticated) {
@@ -174,6 +229,46 @@ export default function AdminReviewPage() {
           ))}
         </div>
 
+        {/* Bulk actions */}
+        {filter === "pending" && pendingPosts.length > 0 && (
+          <div className="mb-4 flex items-center justify-between bg-muted/50 p-4 rounded-lg">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleSelectAll}
+                className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
+              >
+                {allSelected ? (
+                  <CheckSquare className="h-5 w-5" />
+                ) : (
+                  <Square className="h-5 w-5" />
+                )}
+                {allSelected ? "전체 해제" : "전체 선택"}
+              </button>
+              {selectedIds.size > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  {selectedIds.size}개 선택됨
+                </span>
+              )}
+            </div>
+            {selectedIds.size > 0 && (
+              <button
+                onClick={handleBulkApprove}
+                disabled={isBulkProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isBulkProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    처리중...
+                  </>
+                ) : (
+                  <>일괄 승인 ({selectedIds.size})</>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Posts list */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -190,6 +285,9 @@ export default function AdminReviewPage() {
                 key={post.id}
                 post={post}
                 onUpdate={fetchPosts}
+                isSelected={selectedIds.has(post.id)}
+                onSelect={handleSelect}
+                showCheckbox={filter === "pending"}
               />
             ))}
           </div>
