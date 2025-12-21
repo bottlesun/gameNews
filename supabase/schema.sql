@@ -77,3 +77,51 @@ INSERT INTO posts (title, summary, category, original_link) VALUES
     'https://lolesports.com/worlds-2024'
   );
 */
+
+-- ============================================
+-- Posts Pending 테이블 (검수 대기 뉴스)
+-- ============================================
+
+-- 기존 정책 삭제 (있다면)
+DROP POLICY IF EXISTS "Pending posts are viewable by everyone" ON posts_pending;
+DROP POLICY IF EXISTS "Authenticated users can insert pending posts" ON posts_pending;
+DROP POLICY IF EXISTS "Authenticated users can update pending posts" ON posts_pending;
+
+-- Posts Pending 테이블 생성 (없을 때만)
+CREATE TABLE IF NOT EXISTS posts_pending (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  original_link TEXT NOT NULL,
+  category TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- 검수 관련 필드
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewed_at TIMESTAMPTZ,
+  review_note TEXT
+);
+
+-- 인덱스 생성 (성능 최적화)
+CREATE INDEX IF NOT EXISTS idx_posts_pending_status ON posts_pending(status);
+CREATE INDEX IF NOT EXISTS idx_posts_pending_created_at ON posts_pending(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_pending_category ON posts_pending(category);
+
+-- Row Level Security (RLS) 활성화
+ALTER TABLE posts_pending ENABLE ROW LEVEL SECURITY;
+
+-- Posts Pending 정책: 모든 사용자가 읽을 수 있음
+CREATE POLICY "Pending posts are viewable by everyone"
+  ON posts_pending FOR SELECT
+  USING (true);
+
+-- Posts Pending 정책: 인증된 사용자만 삽입 가능
+-- service_role 키를 사용하면 이 정책을 우회합니다
+CREATE POLICY "Authenticated users can insert pending posts"
+  ON posts_pending FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Posts Pending 정책: 인증된 사용자만 업데이트 가능
+CREATE POLICY "Authenticated users can update pending posts"
+  ON posts_pending FOR UPDATE
+  USING (auth.role() = 'authenticated');

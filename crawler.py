@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-게임 뉴스 크롤러
-RSS 피드에서 게임 관련 뉴스를 가져와 Supabase에 저장합니다.
+게임 뉴스 크롤러 (검수 시스템 적용)
+RSS 피드에서 게임 관련 뉴스를 가져와 Supabase의 posts_pending 테이블에 저장합니다.
+검수 후 승인되면 posts 테이블로 이동됩니다.
 """
 
 import os
+import re
 import feedparser
 from supabase import create_client, Client
 from datetime import datetime
@@ -53,13 +55,27 @@ RSS_FEEDS = [
     },
 ]
 
-def clean_summary(text: str, max_length: int = 300) -> str:
+def clean_title(title: str) -> str:
+    """
+    Google News 제목에서 출처(Publisher) 부분을 제거합니다.
+    예: "기사 제목 - 언론사명" -> "기사 제목"
+    """
+    if not title:
+        return ""
+    
+    # " - 언론사명" 패턴 제거
+    if " - " in title:
+        parts = title.rsplit(" - ", 1)
+        title = parts[0].strip()
+    
+    return title
+
+def clean_summary(text: str, max_length: int = 200) -> str:
     """요약 텍스트를 정리하고 길이를 제한합니다."""
     if not text:
         return ""
     
-    # HTML 태그 제거 (간단한 방법)
-    import re
+    # HTML 태그 제거
     text = re.sub(r'<[^>]+>', '', text)
     
     # 공백 정리
@@ -72,7 +88,7 @@ def clean_summary(text: str, max_length: int = 300) -> str:
     return text
 
 def fetch_and_store_news():
-    """RSS 피드에서 뉴스를 가져와 Supabase에 저장합니다."""
+    """RSS 피드에서 뉴스를 가져와 Supabase의 posts_pending 테이블에 저장합니다."""
     total_added = 0
     total_skipped = 0
     
@@ -87,39 +103,57 @@ def fetch_and_store_news():
             if feed.bozo:
                 print(f"⚠️  Warning: Feed parsing error for {feed_info['name']}")
             
-            for entry in feed.entries[:10]:  # 최근 10개만 가져오기
+            for entry in feed.entries:  # 모든 엔트리 처리
                 try:
-                    title = entry.get('title', 'No Title')
+                    # 원본 데이터 추출
+                    raw_title = entry.get('title', 'No Title')
                     link = entry.get('link', '')
-                    summary = clean_summary(entry.get('summary', entry.get('description', '')))
+                    raw_summary = entry.get('summary', entry.get('description', ''))
                     
                     if not link:
-                        print(f"  ⏭️  Skipping entry without link: {title}")
+                        print(f"  ⏭️  Skipping entry without link: {raw_title}")
                         continue
                     
-                    # 카테고리는 RSS 피드 출처 사용
+                    # 제목 정리 (Google News의 경우 출처 제거)
+                    title = clean_title(raw_title)
+                    
+                    # 요약 정리
+                    summary = clean_summary(raw_summary)
+                    
+                    # 카테고리 설정
                     category = feed_info['category']
                     
-                    # 중복 확인 (같은 링크가 이미 있는지)
-                    existing = supabase.table('posts').select('id').eq('original_link', link).execute()
+                    # 중복 확인 (제목 + 링크 조합으로 체크)
+                    # posts_pending 테이블에서 확인
+                    existing_pending = supabase.table('posts_pending').select('id')\
+                        .eq('title', title)\
+                        .eq('original_link', link)\
+                        .execute()
                     
-                    if existing.data:
+                    # posts 테이블에서도 확인
+                    existing_published = supabase.table('posts').select('id')\
+                        .eq('title', title)\
+                        .eq('original_link', link)\
+                        .execute()
+                    
+                    if existing_pending.data or existing_published.data:
                         print(f"  ⏭️  Already exists: {title[:50]}...")
                         total_skipped += 1
                         continue
                     
-                    # Supabase에 저장
+                    # posts_pending 테이블에 저장
                     data = {
                         'title': title,
                         'summary': summary or '요약 정보가 없습니다.',
                         'original_link': link,
                         'category': category,
+                        'status': 'pending'
                     }
                     
-                    result = supabase.table('posts').insert(data).execute()
+                    result = supabase.table('posts_pending').insert(data).execute()
                     
                     if result.data:
-                        print(f"  ✅ Added: {title[:50]}... [{category}]")
+                        print(f"  ✅ Added to pending: {title[:50]}... [{category}]")
                         total_added += 1
                     else:
                         print(f"  ❌ Failed to add: {title[:50]}...")
