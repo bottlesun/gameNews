@@ -24,7 +24,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# RSS 피드 목록 (한국 + 영문 게임 뉴스)
+# RSS 피드 목록 (한국 게임 뉴스만)
 RSS_FEEDS = [
     # 한국 게임 뉴스 (Google News)
     {
@@ -36,22 +36,6 @@ RSS_FEEDS = [
         "url": "https://news.google.com/rss/search?q=게임개발+OR+언리얼엔진+OR+인디게임+when:1d&hl=ko&gl=KR&ceid=KR:ko",
         "category": "Dev",
         "name": "게임 개발 (Dev)"
-    },
-    # 영문 게임 뉴스
-    {
-        "url": "https://www.gamedeveloper.com/rss.xml",
-        "category": "Game Developer",
-        "name": "Game Developer"
-    },
-    {
-        "url": "https://www.gamesindustry.biz/feed",
-        "category": "GamesIndustry.biz",
-        "name": "GamesIndustry.biz"
-    },
-    {
-        "url": "https://www.polygon.com/rss/index.xml",
-        "category": "Polygon",
-        "name": "Polygon"
     },
 ]
 
