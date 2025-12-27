@@ -6,6 +6,7 @@ export interface Post {
   summary: string;
   original_link: string;
   category: string;
+  tags?: string[]; // 자동 추출된 태그
   created_at: string;
 }
 

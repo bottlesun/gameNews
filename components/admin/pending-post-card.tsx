@@ -10,6 +10,7 @@ interface PendingPost {
   summary: string;
   original_link: string;
   category: string;
+  tags?: string[]; // 자동 추출된 태그
   created_at: string;
   status: string;
 }
@@ -126,9 +127,23 @@ export function PendingPostCard({
           <h3 className="font-semibold text-lg mb-2 line-clamp-2">
             {post.title}
           </h3>
-          <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
             {post.summary}
           </p>
+
+          {/* Tags */}
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {post.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">

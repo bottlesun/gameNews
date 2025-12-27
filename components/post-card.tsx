@@ -55,6 +55,22 @@ export function PostCard({ post }: PostCardProps) {
         <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mb-3">
           {post.summary}
         </p>
+
+        {/* Tags */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {post.tags.map((tag, index) => (
+              <Badge
+                key={index}
+                variant="secondary"
+                className="text-xs px-2 py-0.5 bg-primary/10 text-primary border-primary/20"
+              >
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+
         <time className="text-xs text-muted-foreground">{timeAgo}</time>
       </CardContent>
     </Card>
