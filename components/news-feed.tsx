@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { PostCard } from "@/components/post-card";
+import { PostListItem } from "@/components/post-list-item";
 import { Post } from "@/lib/types/database";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, LayoutGrid, List } from "lucide-react";
 
 interface NewsFeedProps {
   category?: string | null;
@@ -17,6 +18,8 @@ export function NewsFeed({ category }: NewsFeedProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const [error, setError] = useState<string | null>(null);
+  // View mode state
+  const [viewMode, setViewMode] = useState<"card" | "list">("card");
 
   // Supabase 환경 변수 확인
   const hasSupabaseConfig =
@@ -96,13 +99,55 @@ export function NewsFeed({ category }: NewsFeedProps) {
 
   return (
     <>
-      <div className="space-y-4">
-        {posts
-          .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-          .map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
+      {/* View Toggle */}
+      <div className="flex justify-end mb-4">
+        <div
+          className="inline-flex rounded-md border border-border"
+          role="group"
+        >
+          <button
+            onClick={() => setViewMode("card")}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === "card"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background hover:bg-muted"
+            } rounded-l-md`}
+            title="카드 뷰"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === "list"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background hover:bg-muted"
+            } rounded-r-md border-l border-border`}
+            title="리스트 뷰"
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
+
+      {/* Posts */}
+      {viewMode === "card" ? (
+        <div className="space-y-4">
+          {posts
+            .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+            .map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+        </div>
+      ) : (
+        <div className="border border-border rounded-lg overflow-hidden">
+          {posts
+            .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+            .map((post) => (
+              <PostListItem key={post.id} post={post} />
+            ))}
+        </div>
+      )}
 
       {/* Pagination */}
       {posts.length > itemsPerPage && (
