@@ -8,6 +8,7 @@ RSS 피드에서 게임 관련 뉴스를 가져와 Supabase의 posts_pending 테
 import os
 import re
 import feedparser
+from difflib import SequenceMatcher
 from supabase import create_client, Client
 from datetime import datetime
 from dotenv import load_dotenv
@@ -71,6 +72,99 @@ def clean_summary(text: str, max_length: int = 200) -> str:
     
     return text
 
+def calculate_similarity(text1: str, text2: str) -> float:
+    """
+    두 텍스트의 유사도를 계산합니다 (0.0 ~ 1.0).
+    0.8 이상이면 매우 유사한 것으로 판단합니다.
+    """
+    if not text1 or not text2:
+        return 0.0
+    
+    # 소문자로 변환하고 공백 정리
+    text1 = ' '.join(text1.lower().split())
+    text2 = ' '.join(text2.lower().split())
+    
+    # SequenceMatcher로 유사도 계산
+    return SequenceMatcher(None, text1, text2).ratio()
+
+def extract_tags(text: str) -> list:
+    """
+    텍스트에서 주요 키워드(태그)를 추출합니다.
+    회사명, 게임명, 기술 키워드 등을 자동으로 감지합니다.
+    """
+    if not text:
+        return []
+    
+    tags = []
+    text_lower = text.lower()
+    
+    # 회사명 키워드
+    companies = [
+        '넥슨', '엔씨소프트', 'NC소프트', '크래프톤', '펄어비스', 
+        '넷마블', '컴투스', '스마일게이트', '카카오게임즈', '위메이드',
+        '블리자드', '라이엇게임즈', '밸브', '에픽게임즈'
+    ]
+    
+    # 게임명 키워드
+    games = [
+        '리니지', '메이플스토리', '던전앤파이터', '배틀그라운드', 'PUBG',
+        '검은사막', '로스트아크', '오버워치', '리그오브레전드', 'LOL',
+        '카트라이더', '서든어택', '피파온라인'
+    ]
+    
+    # 기술/엔진 키워드
+    tech = [
+        '언리얼엔진', 'Unreal Engine', 'Unity', '유니티',
+        'AI', '인공지능', '메타버스', 'VR', 'AR', 'NFT', '블록체인'
+    ]
+    
+    # 장르 키워드
+    genres = [
+        'MMORPG', 'RPG', 'FPS', 'AOS', 'MOBA', 
+        '배틀로얄', '시뮬레이션', '전략', '액션', '어드벤처'
+    ]
+    
+    # 모든 키워드 리스트 합치기
+    all_keywords = companies + games + tech + genres
+    
+    # 텍스트에서 키워드 찾기
+    for keyword in all_keywords:
+        if keyword.lower() in text_lower:
+            # 중복 방지
+            if keyword not in tags:
+                tags.append(keyword)
+    
+    return tags
+
+def is_spam(text: str) -> bool:
+    """
+    스팸/저품질 뉴스인지 판단합니다.
+    블랙리스트 키워드가 포함되어 있으면 True를 반환합니다.
+    """
+    if not text:
+        return False
+    
+    text_lower = text.lower()
+    
+    # 스팸 키워드 블랙리스트
+    spam_keywords = [
+        # 광고성
+        '할인', '쿠폰', '이벤트 참여', '경품', '프로모션',
+        # 클릭베이트
+        '충격', '놀라운', '반전', '대박', '실화',
+        # 관련 없는 내용
+        '날씨', '주식', '부동산', '정치',
+        # 성인/도박
+        '카지노', '도박', '성인',
+    ]
+    
+    # 블랙리스트 키워드 체크
+    for keyword in spam_keywords:
+        if keyword in text_lower:
+            return True
+    
+    return False
+
 def fetch_and_store_news():
     """RSS 피드에서 뉴스를 가져와 Supabase의 posts_pending 테이블에 저장합니다."""
     total_added = 0
@@ -104,40 +198,89 @@ def fetch_and_store_news():
                     # 요약 정리
                     summary = clean_summary(raw_summary)
                     
+                    # 태그 추출 (제목 + 요약에서)
+                    tags = extract_tags(f"{title} {summary}")
+                    
+                    # 스팸 필터링 체크
+                    spam_check_text = f"{title} {summary}"
+                    is_spam_content = is_spam(spam_check_text)
+                    
                     # 카테고리 설정
                     category = feed_info['category']
                     
-                    # 중복 확인 (제목 + 링크 조합으로 체크)
-                    # posts_pending 테이블에서 확인
+                    # 중복 확인 (정확한 일치 + 유사도 체크)
+                    # 1. 정확한 일치 확인 (제목 + 링크)
                     existing_pending = supabase.table('posts_pending').select('id')\
                         .eq('title', title)\
                         .eq('original_link', link)\
                         .execute()
                     
-                    # posts 테이블에서도 확인
                     existing_published = supabase.table('posts').select('id')\
                         .eq('title', title)\
                         .eq('original_link', link)\
                         .execute()
                     
                     if existing_pending.data or existing_published.data:
-                        print(f"  ⏭️  Already exists: {title[:50]}...")
+                        print(f"  ⏭️  Already exists (exact match): {title[:50]}...")
+                        total_skipped += 1
+                        continue
+                    
+                    # 2. 유사도 체크 (제목만 비교, 80% 이상 유사하면 중복으로 간주)
+                    # 최근 100개 뉴스와 비교
+                    recent_pending = supabase.table('posts_pending').select('title')\
+                        .order('created_at', desc=True)\
+                        .limit(100)\
+                        .execute()
+                    
+                    recent_published = supabase.table('posts').select('title')\
+                        .order('created_at', desc=True)\
+                        .limit(100)\
+                        .execute()
+                    
+                    is_similar = False
+                    similarity_threshold = 0.8  # 80% 이상 유사하면 중복
+                    
+                    # pending 뉴스와 비교
+                    for existing in recent_pending.data:
+                        similarity = calculate_similarity(title, existing['title'])
+                        if similarity >= similarity_threshold:
+                            print(f"  ⏭️  Similar to existing ({similarity:.0%}): {title[:50]}...")
+                            print(f"      Existing: {existing['title'][:50]}...")
+                            is_similar = True
+                            break
+                    
+                    # published 뉴스와 비교
+                    if not is_similar:
+                        for existing in recent_published.data:
+                            similarity = calculate_similarity(title, existing['title'])
+                            if similarity >= similarity_threshold:
+                                print(f"  ⏭️  Similar to published ({similarity:.0%}): {title[:50]}...")
+                                print(f"      Existing: {existing['title'][:50]}...")
+                                is_similar = True
+                                break
+                    
+                    if is_similar:
                         total_skipped += 1
                         continue
                     
                     # posts_pending 테이블에 저장
+                    # 스팸이면 자동으로 rejected 상태로 저장
                     data = {
                         'title': title,
                         'summary': summary or '요약 정보가 없습니다.',
                         'original_link': link,
                         'category': category,
-                        'status': 'pending'
+                        'tags': tags,  # 자동 추출된 태그
+                        'status': 'rejected' if is_spam_content else 'pending',
+                        'review_note': '스팸 필터링: 블랙리스트 키워드 감지' if is_spam_content else None
                     }
                     
                     result = supabase.table('posts_pending').insert(data).execute()
                     
                     if result.data:
-                        print(f"  ✅ Added to pending: {title[:50]}... [{category}]")
+                        tags_str = f" [Tags: {', '.join(tags)}]" if tags else ""
+                        status_str = " [🚫 SPAM - Auto-rejected]" if is_spam_content else ""
+                        print(f"  ✅ Added to pending: {title[:50]}... [{category}]{tags_str}{status_str}")
                         total_added += 1
                     else:
                         print(f"  ❌ Failed to add: {title[:50]}...")

@@ -67,6 +67,7 @@ export async function approvePost(pendingId: string) {
       summary: pending.summary,
       original_link: pending.original_link,
       category: pending.category,
+      tags: pending.tags || [], // 태그도 복사
     };
 
     console.log("Attempting to insert:", insertData);

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS posts (
   summary TEXT NOT NULL,
   original_link TEXT NOT NULL,
   category TEXT NOT NULL,
+  tags JSONB DEFAULT '[]'::jsonb,  -- 자동 추출된 태그 (회사명, 게임명, 기술 등)
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS posts_pending (
   summary TEXT NOT NULL,
   original_link TEXT NOT NULL,
   category TEXT NOT NULL,
+  tags JSONB DEFAULT '[]'::jsonb,  -- 자동 추출된 태그
   created_at TIMESTAMPTZ DEFAULT NOW(),
   
   -- 검수 관련 필드
