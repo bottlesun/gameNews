@@ -8,6 +8,7 @@ RSS 피드에서 게임 관련 뉴스를 가져와 Supabase의 posts_pending 테
 import os
 import re
 import feedparser
+import requests
 from difflib import SequenceMatcher
 from supabase import create_client, Client
 from datetime import datetime
@@ -19,6 +20,7 @@ load_dotenv()
 # Supabase 클라이언트 초기화
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")  # Optional
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables")
@@ -170,12 +172,109 @@ def is_spam(text: str) -> bool:
     
     return False
 
+def send_discord_notification(stats: dict, error: str = None):
+    """
+    Discord 웹훅으로 크롤링 결과를 전송합니다.
+    
+    Args:
+        stats: 크롤링 통계 정보 딕셔너리
+        error: 에러 메시지 (선택적)
+    """
+    if not DISCORD_WEBHOOK_URL:
+        return  # 웹훅 URL이 없으면 조용히 스킵
+    
+    try:
+        # 성공/실패에 따라 색상 결정
+        color = 0xFF0000 if error else 0x00FF00  # 빨강(에러) 또는 초록(성공)
+        
+        # 임베드 메시지 구성
+        embed = {
+            "title": "🎮 게임 뉴스 크롤러 실행 완료" if not error else "❌ 크롤러 실행 실패",
+            "color": color,
+            "timestamp": datetime.utcnow().isoformat(),
+            "fields": []
+        }
+        
+        if error:
+            # 에러 발생 시
+            embed["fields"].append({
+                "name": "❌ 에러",
+                "value": f"```{error[:1000]}```",
+                "inline": False
+            })
+        else:
+            # 정상 실행 시 통계 정보
+            embed["fields"] = [
+                {
+                    "name": "✅ 새 기사",
+                    "value": f"**{stats.get('added', 0)}개**",
+                    "inline": True
+                },
+                {
+                    "name": "⏭️ 중복 스킵",
+                    "value": f"{stats.get('skipped', 0)}개",
+                    "inline": True
+                },
+                {
+                    "name": "🚫 스팸 차단",
+                    "value": f"{stats.get('spam', 0)}개",
+                    "inline": True
+                },
+                {
+                    "name": "📊 총 처리",
+                    "value": f"{stats.get('total_processed', 0)}개",
+                    "inline": True
+                },
+                {
+                    "name": "🏷️ 태그 생성",
+                    "value": f"{stats.get('total_tags', 0)}개",
+                    "inline": True
+                },
+                {
+                    "name": "⏱️ 소요 시간",
+                    "value": f"{stats.get('duration', 0):.1f}초",
+                    "inline": True
+                }
+            ]
+            
+            # 상위 태그 정보 추가 (있는 경우)
+            if stats.get('top_tags'):
+                top_tags_str = ", ".join([f"`{tag}`" for tag in stats['top_tags'][:10]])
+                embed["fields"].append({
+                    "name": "🔥 주요 태그",
+                    "value": top_tags_str,
+                    "inline": False
+                })
+        
+        # 푸터 추가
+        embed["footer"] = {
+            "text": f"실행 시간: {stats.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}"
+        }
+        
+        # Discord 웹훅으로 전송
+        payload = {
+            "embeds": [embed]
+        }
+        
+        response = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
+        response.raise_for_status()
+        
+        print("\n📨 Discord 알림 전송 완료!")
+        
+    except Exception as e:
+        print(f"\n⚠️  Discord 알림 전송 실패: {str(e)}")
+        # 알림 실패는 크롤러 전체 실패로 이어지지 않도록 조용히 처리
+
 def fetch_and_store_news():
     """RSS 피드에서 뉴스를 가져와 Supabase의 posts_pending 테이블에 저장합니다."""
+    start_time = datetime.now()
     total_added = 0
     total_skipped = 0
+    total_spam = 0
+    total_tags_count = 0
+    all_tags = []
     
-    print(f"🚀 Starting news crawler at {datetime.now()}")
+    print(f"🚀 Starting news crawler at {start_time}")
     
     for feed_info in RSS_FEEDS:
         print(f"\n📰 Fetching from {feed_info['name']}...")
@@ -209,6 +308,10 @@ def fetch_and_store_news():
                     # 스팸 필터링 체크
                     spam_check_text = f"{title} {summary}"
                     is_spam_content = is_spam(spam_check_text)
+                    
+                    # 스팸 카운트
+                    if is_spam_content:
+                        total_spam += 1
                     
                     # 카테고리 설정
                     category = feed_info['category']
@@ -287,6 +390,11 @@ def fetch_and_store_news():
                         status_str = " [🚫 SPAM - Auto-rejected]" if is_spam_content else ""
                         print(f"  ✅ Added to pending: {title[:50]}... [{category}]{tags_str}{status_str}")
                         total_added += 1
+                        
+                        # 태그 통계 수집
+                        if tags:
+                            total_tags_count += len(tags)
+                            all_tags.extend(tags)
                     else:
                         print(f"  ❌ Failed to add: {title[:50]}...")
                         
@@ -298,15 +406,48 @@ def fetch_and_store_news():
             print(f"❌ Error fetching feed {feed_info['name']}: {str(e)}")
             continue
     
-    print(f"\n✨ Crawler finished!")
-    print(f"📊 Summary: {total_added} added, {total_skipped} skipped")
+    # 실행 시간 계산
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
     
-    return total_added, total_skipped
+    print(f"\n✨ Crawler finished!")
+    print(f"📊 Summary: {total_added} added, {total_skipped} skipped, {total_spam} spam blocked")
+    
+    # 상위 태그 추출 (빈도순)
+    from collections import Counter
+    tag_counter = Counter(all_tags)
+    top_tags = [tag for tag, count in tag_counter.most_common(10)]
+    
+    # 통계 정보 구성
+    stats = {
+        'added': total_added,
+        'skipped': total_skipped,
+        'spam': total_spam,
+        'total_processed': total_added + total_skipped,
+        'total_tags': total_tags_count,
+        'top_tags': top_tags,
+        'duration': duration,
+        'timestamp': start_time.strftime('%Y-%m-%d %H:%M:%S')
+    }
+    
+    return stats
 
 if __name__ == "__main__":
     try:
-        added, skipped = fetch_and_store_news()
-        print(f"\n🎉 Success! Added {added} new posts.")
+        stats = fetch_and_store_news()
+        
+        # Discord 알림 전송
+        send_discord_notification(stats)
+        
+        print(f"\n🎉 Success! Added {stats['added']} new posts.")
     except Exception as e:
-        print(f"\n💥 Fatal error: {str(e)}")
+        error_msg = str(e)
+        print(f"\n💥 Fatal error: {error_msg}")
+        
+        # 에러 발생 시에도 Discord 알림 전송
+        send_discord_notification(
+            {'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')},
+            error=error_msg
+        )
+        
         exit(1)
