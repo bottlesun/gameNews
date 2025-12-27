@@ -1,8 +1,10 @@
 name: Manual News Crawler
 
-# 수동 실행만 가능 (workflow_dispatch)
+# 수동 실행 + 매시간 자동 실행
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 수동 실행 가능
+  schedule:
+    - cron: "50 14 * * *" # 매일 오후 11시 50분 (KST) = 14:50 (UTC)
 
 jobs:
   crawl:
