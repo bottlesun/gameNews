@@ -2,30 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { PendingPostCard } from "@/components/admin/pending-post-card";
-import { bulkApprove } from "@/lib/actions/review-actions";
-import { Loader2, Lock, CheckSquare, Square } from "lucide-react";
+import { deletePost } from "@/lib/actions/delete-actions";
+import { Loader2, Lock, Trash2, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { formatDistanceToNow } from "date-fns";
+import { ko } from "date-fns/locale";
 
-interface PendingPost {
+interface Post {
   id: string;
   title: string;
   summary: string;
   original_link: string;
   category: string;
+  tags: string[];
   created_at: string;
-  status: string;
 }
 
-export default function AdminReviewPage() {
+const categoryColors: Record<string, string> = {
+  Industry: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  Dev: "bg-green-500/10 text-green-500 border-green-500/20",
+};
+
+export default function AdminManagePage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
-  const [posts, setPosts] = useState<PendingPost[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<
-    "all" | "pending" | "approved" | "rejected"
-  >("pending");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,18 +47,11 @@ export default function AdminReviewPage() {
     if (isAuthenticated) {
       fetchPosts();
     }
-  }, [isAuthenticated, filter]);
-
-  // Clear selection when filter changes
-  useEffect(() => {
-    setSelectedIds(new Set());
-    setCurrentPage(1); // Reset to page 1 when filter changes
-  }, [filter]);
+  }, [isAuthenticated]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Simple password check (you should add NEXT_PUBLIC_ADMIN_PASSWORD to .env.local)
     const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
     if (password === adminPassword) {
@@ -71,16 +67,10 @@ export default function AdminReviewPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      let query = supabase
-        .from("posts_pending")
+      const { data, error } = await supabase
+        .from("posts")
         .select("*")
         .order("created_at", { ascending: false });
-
-      if (filter !== "all") {
-        query = query.eq("status", filter);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setPosts(data || []);
@@ -97,52 +87,26 @@ export default function AdminReviewPage() {
     setPassword("");
   };
 
-  const handleSelect = (id: string, selected: boolean) => {
-    const newSelected = new Set(selectedIds);
-    if (selected) {
-      newSelected.add(id);
-    } else {
-      newSelected.delete(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    const pendingPosts = posts.filter((p) => p.status === "pending");
-    if (selectedIds.size === pendingPosts.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(pendingPosts.map((p) => p.id)));
-    }
-  };
-
-  const handleBulkApprove = async () => {
-    if (selectedIds.size === 0) {
-      alert("승인할 항목을 선택해주세요");
+  const handleDelete = async (postId: string, title: string) => {
+    if (
+      !confirm(
+        `"${title}" 게시물을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
+      )
+    ) {
       return;
     }
 
-    if (!confirm(`선택한 ${selectedIds.size}개의 항목을 승인하시겠습니까?`)) {
-      return;
-    }
-
-    setIsBulkProcessing(true);
-    const result = await bulkApprove(Array.from(selectedIds));
+    setDeletingId(postId);
+    const result = await deletePost(postId);
 
     if (result.success) {
-      alert(`${result.count}개 항목이 승인되었습니다`);
-      setSelectedIds(new Set());
       await fetchPosts();
     } else {
-      alert(`승인 실패: ${result.error}`);
+      alert(`삭제 실패: ${result.error}`);
     }
 
-    setIsBulkProcessing(false);
+    setDeletingId(null);
   };
-
-  const pendingPosts = posts.filter((p) => p.status === "pending");
-  const allSelected =
-    pendingPosts.length > 0 && selectedIds.size === pendingPosts.length;
 
   // Login form
   if (!isAuthenticated) {
@@ -186,16 +150,16 @@ export default function AdminReviewPage() {
     );
   }
 
-  // Admin review page
+  // Admin manage page
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2">뉴스 검수</h1>
+            <h1 className="text-3xl font-bold mb-2">게시물 관리</h1>
             <p className="text-muted-foreground">
-              크롤링된 뉴스를 검토하고 승인/거부하세요
+              게시된 뉴스를 관리하고 삭제할 수 있습니다
             </p>
           </div>
           <button
@@ -206,73 +170,13 @@ export default function AdminReviewPage() {
           </button>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-2 mb-6 border-b border-border">
-          {[
-            { value: "pending", label: "대기중" },
-            { value: "all", label: "전체" },
-            { value: "approved", label: "승인됨" },
-            { value: "rejected", label: "거부됨" },
-          ].map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setFilter(tab.value as typeof filter)}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-                filter === tab.value
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              {tab.value === "pending" &&
-                posts.filter((p) => p.status === "pending").length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 bg-primary text-primary-foreground rounded-full text-xs">
-                    {posts.filter((p) => p.status === "pending").length}
-                  </span>
-                )}
-            </button>
-          ))}
+        {/* Stats */}
+        <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            총 <span className="font-bold text-foreground">{posts.length}</span>
+            개의 게시물
+          </p>
         </div>
-
-        {/* Bulk actions */}
-        {filter === "pending" && pendingPosts.length > 0 && (
-          <div className="mb-4 flex items-center justify-between bg-muted/50 p-4 rounded-lg">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleSelectAll}
-                className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
-              >
-                {allSelected ? (
-                  <CheckSquare className="h-5 w-5" />
-                ) : (
-                  <Square className="h-5 w-5" />
-                )}
-                {allSelected ? "전체 해제" : "전체 선택"}
-              </button>
-              {selectedIds.size > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  {selectedIds.size}개 선택됨
-                </span>
-              )}
-            </div>
-            {selectedIds.size > 0 && (
-              <button
-                onClick={handleBulkApprove}
-                disabled={isBulkProcessing}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isBulkProcessing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    처리중...
-                  </>
-                ) : (
-                  <>일괄 승인 ({selectedIds.size})</>
-                )}
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Posts list */}
         {loading ? (
@@ -281,26 +185,109 @@ export default function AdminReviewPage() {
           </div>
         ) : posts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">검수할 뉴스가 없습니다</p>
+            <p className="text-muted-foreground">게시물이 없습니다</p>
           </div>
         ) : (
           <>
-            <div className="grid gap-4">
+            <div className="space-y-3">
               {posts
                 .slice(
                   (currentPage - 1) * itemsPerPage,
                   currentPage * itemsPerPage
                 )
-                .map((post) => (
-                  <PendingPostCard
-                    key={post.id}
-                    post={post}
-                    onUpdate={fetchPosts}
-                    isSelected={selectedIds.has(post.id)}
-                    onSelect={handleSelect}
-                    showCheckbox={filter === "pending"}
-                  />
-                ))}
+                .map((post) => {
+                  const timeAgo = formatDistanceToNow(
+                    new Date(post.created_at),
+                    {
+                      addSuffix: true,
+                      locale: ko,
+                    }
+                  );
+
+                  return (
+                    <div
+                      key={post.id}
+                      className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* Title and Link */}
+                          <div className="flex items-start gap-2 mb-2">
+                            <a
+                              href={post.original_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 text-base font-semibold hover:text-primary transition-colors line-clamp-2"
+                            >
+                              {post.title}
+                            </a>
+                            <a
+                              href={post.original_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-shrink-0"
+                            >
+                              <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                            </a>
+                          </div>
+
+                          {/* Summary */}
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                            {post.summary}
+                          </p>
+
+                          {/* Tags and Meta */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={
+                                categoryColors[post.category] ||
+                                "bg-gray-500/10 text-gray-500"
+                              }
+                            >
+                              {post.category}
+                            </Badge>
+                            {post.tags && post.tags.length > 0 && (
+                              <>
+                                {post.tags.slice(0, 3).map((tag, index) => (
+                                  <Badge
+                                    key={index}
+                                    variant="secondary"
+                                    className="text-xs bg-primary/10 text-primary border-primary/20"
+                                  >
+                                    {tag}
+                                  </Badge>
+                                ))}
+                                {post.tags.length > 3 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    +{post.tags.length - 3}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              · {timeAgo}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Delete Button */}
+                        <button
+                          onClick={() => handleDelete(post.id, post.title)}
+                          disabled={deletingId === post.id}
+                          className="flex-shrink-0 p-2 text-red-500 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="삭제"
+                        >
+                          {deletingId === post.id ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
 
             {/* Pagination */}
@@ -323,7 +310,6 @@ export default function AdminReviewPage() {
                   )
                     .filter((page) => {
                       const totalPages = Math.ceil(posts.length / itemsPerPage);
-                      // Show first page, last page, current page, and pages around current
                       return (
                         page === 1 ||
                         page === totalPages ||

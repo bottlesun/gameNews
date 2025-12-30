@@ -309,38 +309,30 @@ def fetch_and_store_news():
                     spam_check_text = f"{title} {summary}"
                     is_spam_content = is_spam(spam_check_text)
                     
-                    # 스팸 카운트
+                    # 스팸이면 저장하지 않고 스킵
                     if is_spam_content:
                         total_spam += 1
+                        print(f"  🚫 Spam detected: {title[:50]}...")
+                        continue
                     
                     # 카테고리 설정
                     category = feed_info['category']
                     
                     # 중복 확인 (정확한 일치 + 유사도 체크)
                     # 1. 정확한 일치 확인 (제목 + 링크)
-                    existing_pending = supabase.table('posts_pending').select('id')\
+                    existing_posts = supabase.table('posts').select('id')\
                         .eq('title', title)\
                         .eq('original_link', link)\
                         .execute()
                     
-                    existing_published = supabase.table('posts').select('id')\
-                        .eq('title', title)\
-                        .eq('original_link', link)\
-                        .execute()
-                    
-                    if existing_pending.data or existing_published.data:
+                    if existing_posts.data:
                         print(f"  ⏭️  Already exists (exact match): {title[:50]}...")
                         total_skipped += 1
                         continue
                     
                     # 2. 유사도 체크 (제목만 비교, 80% 이상 유사하면 중복으로 간주)
                     # 최근 100개 뉴스와 비교
-                    recent_pending = supabase.table('posts_pending').select('title')\
-                        .order('created_at', desc=True)\
-                        .limit(100)\
-                        .execute()
-                    
-                    recent_published = supabase.table('posts').select('title')\
+                    recent_posts = supabase.table('posts').select('title')\
                         .order('created_at', desc=True)\
                         .limit(100)\
                         .execute()
@@ -348,8 +340,8 @@ def fetch_and_store_news():
                     is_similar = False
                     similarity_threshold = 0.8  # 80% 이상 유사하면 중복
                     
-                    # pending 뉴스와 비교
-                    for existing in recent_pending.data:
+                    # 기존 뉴스와 비교
+                    for existing in recent_posts.data:
                         similarity = calculate_similarity(title, existing['title'])
                         if similarity >= similarity_threshold:
                             print(f"  ⏭️  Similar to existing ({similarity:.0%}): {title[:50]}...")
@@ -357,38 +349,24 @@ def fetch_and_store_news():
                             is_similar = True
                             break
                     
-                    # published 뉴스와 비교
-                    if not is_similar:
-                        for existing in recent_published.data:
-                            similarity = calculate_similarity(title, existing['title'])
-                            if similarity >= similarity_threshold:
-                                print(f"  ⏭️  Similar to published ({similarity:.0%}): {title[:50]}...")
-                                print(f"      Existing: {existing['title'][:50]}...")
-                                is_similar = True
-                                break
-                    
                     if is_similar:
                         total_skipped += 1
                         continue
                     
-                    # posts_pending 테이블에 저장
-                    # 스팸이면 자동으로 rejected 상태로 저장
+                    # posts 테이블에 직접 저장
                     data = {
                         'title': title,
                         'summary': summary or '요약 정보가 없습니다.',
                         'original_link': link,
                         'category': category,
                         'tags': tags,  # 자동 추출된 태그
-                        'status': 'rejected' if is_spam_content else 'pending',
-                        'review_note': '스팸 필터링: 블랙리스트 키워드 감지' if is_spam_content else None
                     }
                     
-                    result = supabase.table('posts_pending').insert(data).execute()
+                    result = supabase.table('posts').insert(data).execute()
                     
                     if result.data:
                         tags_str = f" [Tags: {', '.join(tags)}]" if tags else ""
-                        status_str = " [🚫 SPAM - Auto-rejected]" if is_spam_content else ""
-                        print(f"  ✅ Added to pending: {title[:50]}... [{category}]{tags_str}{status_str}")
+                        print(f"  ✅ Added to posts: {title[:50]}... [{category}]{tags_str}")
                         total_added += 1
                         
                         # 태그 통계 수집
