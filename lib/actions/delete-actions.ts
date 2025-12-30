@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 /**
  * 게시물 삭제
+ * RLS 정책: USING (true) - 누구나 삭제 가능
  */
 export async function deletePost(postId: string) {
   try {
