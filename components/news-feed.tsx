@@ -19,7 +19,7 @@ export function NewsFeed({ category }: NewsFeedProps) {
   const itemsPerPage = 20;
   const [error, setError] = useState<string | null>(null);
   // View mode state
-  const [viewMode, setViewMode] = useState<"card" | "list">("card");
+  const [viewMode, setViewMode] = useState<"card" | "list">("list");
 
   // Supabase 환경 변수 확인
   const hasSupabaseConfig =

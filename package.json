@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@notionhq/client": "^5.6.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
@@ -19,8 +20,13 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.562.0",
     "next": "16.0.10",
+    "notion-client": "^7.7.3",
+    "notion-types": "^7.7.3",
     "react": "19.2.1",
     "react-dom": "19.2.1",
+    "react-markdown": "^10.1.0",
+    "react-notion-x": "^7.7.3",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
