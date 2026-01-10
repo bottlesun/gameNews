@@ -14,13 +14,15 @@ export default async function BlogPage() {
       <div className="container max-w-6xl mx-auto px-4 py-12">
         {/* Header */}
         <header className="mb-12">
-          <div className="flex items-center gap-3 mb-3">
-            <BookOpen className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold">Tech Blog</h1>
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <BookOpen className="h-10 w-10 text-primary" />
+              <h1 className="text-4xl font-bold">Tech Blog</h1>
+            </div>
+            <p className="text-lg text-muted-foreground">
+              Insights, tutorials, and thoughts on technology and development
+            </p>
           </div>
-          <p className="text-lg text-muted-foreground">
-            Insights, tutorials, and thoughts on technology and development
-          </p>
         </header>
 
         {/* Posts Grid */}

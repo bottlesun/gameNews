@@ -1,5 +1,5 @@
 import { getPostDetail, getAllPostIds } from "@/lib/notion";
-import NotionRendererClient from "@/components/notion-renderer-client";
+import NotionBlockRenderer from "@/components/notion-block-renderer";
 import { Calendar, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -107,7 +107,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
           {/* Notion Content */}
           <div className="notion-container">
-            <NotionRendererClient recordMap={post.recordMap} />
+            <NotionBlockRenderer blocks={post.blocks} />
           </div>
         </article>
 

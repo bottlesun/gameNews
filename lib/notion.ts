@@ -1,5 +1,4 @@
 import { Client } from "@notionhq/client";
-import { ExtendedRecordMap } from "notion-types";
 
 // Initialize Notion client
 const notion = new Client({
@@ -29,8 +28,16 @@ export interface NotionPost {
   updatedat: string | null;
 }
 
+// Notion block interface
+export interface NotionBlock {
+  id: string;
+  type: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
 export interface NotionPostDetail extends NotionPost {
-  recordMap: ExtendedRecordMap;
+  blocks: NotionBlock[];
 }
 
 // Rich text type
@@ -182,6 +189,36 @@ export async function getPublishedPosts(): Promise<NotionPost[]> {
 }
 
 /**
+ * Fetch all blocks from a Notion page
+ */
+export async function getPageBlocks(pageId: string): Promise<NotionBlock[]> {
+  try {
+    const formattedPageId = formatDatabaseId(pageId);
+    const blocks: NotionBlock[] = [];
+
+    let cursor: string | undefined = undefined;
+
+    // Fetch all blocks with pagination
+    do {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response: any = await notion.blocks.children.list({
+        block_id: formattedPageId,
+        start_cursor: cursor,
+        page_size: 100,
+      });
+
+      blocks.push(...(response.results as NotionBlock[]));
+      cursor = response.next_cursor || undefined;
+    } while (cursor);
+
+    return blocks;
+  } catch (error) {
+    console.error(`Error fetching blocks for page ${pageId}:`, error);
+    return [];
+  }
+}
+
+/**
  * Fetch a single post detail by page ID
  */
 export async function getPostDetail(pageId: string): Promise<NotionPostDetail> {
@@ -250,16 +287,8 @@ export async function getPostDetail(pageId: string): Promise<NotionPostDetail> {
       }
     }
 
-    // Create empty recordMap for now
-    // TODO: Implement proper block fetching using Notion Blocks API
-    const recordMap: ExtendedRecordMap = {
-      block: {},
-      collection: {},
-      collection_view: {},
-      notion_user: {},
-      collection_query: {},
-      signed_urls: {},
-    };
+    // Fetch page content blocks
+    const blocks = await getPageBlocks(formattedPageId);
 
     return {
       id: formattedPageId,
@@ -268,7 +297,7 @@ export async function getPostDetail(pageId: string): Promise<NotionPostDetail> {
       status,
       createdat,
       updatedat,
-      recordMap,
+      blocks,
     };
   } catch (error) {
     console.error(`Error fetching post detail for ${pageId}:`, error);
