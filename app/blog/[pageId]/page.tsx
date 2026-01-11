@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-export const revalidate = 60; // ISR: Revalidate every 60 seconds
+export const revalidate = 10; // ISR: Revalidate every 10 seconds
 export const dynamicParams = true; // Allow dynamic routes not in generateStaticParams
 
 // Generate static params for all published posts
