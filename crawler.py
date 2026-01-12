@@ -245,6 +245,15 @@ def send_discord_notification(stats: dict, error: str = None):
                     "value": top_tags_str,
                     "inline": False
                 })
+            
+            # 웹사이트 링크 추가 (환경 변수가 설정된 경우만)
+            website_url = os.getenv("WEBSITE_URL")
+            if website_url:
+                embed["fields"].append({
+                    "name": "🌐 웹사이트",
+                    "value": website_url,
+                    "inline": False
+                })
         
         # 푸터 추가
         embed["footer"] = {
