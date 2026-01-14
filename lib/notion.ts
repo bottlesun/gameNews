@@ -101,7 +101,7 @@ export async function getPublishedPosts(): Promise<NotionPost[]> {
     const allPosts = response.results.map((page: any) => {
       const properties = page.properties || {};
 
-      // Extract title
+      // Extract title from 'info' (title type property)
       let title = "Untitled";
       for (const key of Object.keys(properties)) {
         const prop = properties[key];
@@ -111,12 +111,8 @@ export async function getPublishedPosts(): Promise<NotionPost[]> {
         }
       }
 
-      // Extract info
-      let info = "";
-      const infoProp = properties.info || properties.Info;
-      if (infoProp && infoProp.rich_text) {
-        info = richTextToMarkdown(infoProp.rich_text);
-      }
+      // info is no longer used (content goes in page blocks)
+      const info = "";
 
       // Extract status
       let status = "Draft";
@@ -234,7 +230,7 @@ export async function getPostDetail(pageId: string): Promise<NotionPostDetail> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const properties = (page as any).properties || {};
 
-    // Extract title
+    // Extract title from 'info' (title type property)
     let title = "Untitled";
     for (const key of Object.keys(properties)) {
       const prop = properties[key];
@@ -244,12 +240,8 @@ export async function getPostDetail(pageId: string): Promise<NotionPostDetail> {
       }
     }
 
-    // Extract other properties
-    let info = "";
-    const infoProp = properties.info || properties.Info;
-    if (infoProp && infoProp.rich_text) {
-      info = richTextToMarkdown(infoProp.rich_text);
-    }
+    // info is no longer used (content goes in page blocks)
+    const info = "";
 
     let status = "Draft";
     const statusProp = properties.status || properties.Status;
