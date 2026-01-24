@@ -1,0 +1,85 @@
+name: Database Capacity Check
+
+on:
+  schedule:
+    - cron: "0 0 * * 0" # 매주 일요일 자정 (UTC)
+  workflow_dispatch: # 수동 실행
+
+jobs:
+  check-capacity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install supabase
+
+      - name: Check database capacity
+        id: capacity_check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python scripts/check_db_capacity.py
+        continue-on-error: true
+
+      - name: Create Issue if Critical
+        if: steps.capacity_check.outcome == 'failure'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const title = '🔴 데이터베이스 용량 위험';
+            const body = `
+            ## 데이터베이스 용량 경고
+
+            데이터베이스 용량이 위험 수준에 도달했습니다.
+
+            ### 즉시 조치 필요
+
+            1. 아카이빙 실행
+               \`\`\`bash
+               python scripts/archive_old_posts.py
+               \`\`\`
+
+            2. 데이터 정리 실행
+               \`\`\`bash
+               python scripts/cleanup_old_posts.py
+               \`\`\`
+
+            3. 용량 재확인
+               \`\`\`bash
+               python scripts/check_db_capacity.py
+               \`\`\`
+
+            ### 참고 문서
+            - [데이터베이스 유지보수 가이드](docs/database-maintenance.md)
+
+            **생성 시간**: ${new Date().toISOString()}
+            `;
+
+            // 기존 이슈 확인
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'database,urgent'
+            });
+
+            // 동일한 이슈가 없으면 생성
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['database', 'urgent']
+              });
+            }

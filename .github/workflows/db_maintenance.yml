@@ -1,0 +1,81 @@
+name: Database Maintenance
+
+on:
+  schedule:
+    - cron: "0 2 1 * *" # 매월 1일 오전 2시 (UTC)
+  workflow_dispatch: # 수동 실행
+    inputs:
+      archive_months:
+        description: "아카이빙할 개월 수"
+        required: false
+        default: "6"
+      cleanup_months:
+        description: "삭제할 개월 수"
+        required: false
+        default: "6"
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install supabase
+
+      - name: Check initial capacity
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          echo "=== 초기 용량 확인 ==="
+          python scripts/check_db_capacity.py
+
+      - name: Archive old posts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ARCHIVE_MONTHS: ${{ github.event.inputs.archive_months || '6' }}
+        run: |
+          echo "=== 아카이빙 시작 ==="
+          python scripts/archive_old_posts.py
+
+      - name: Upload archives
+        uses: actions/upload-artifact@v3
+        with:
+          name: database-archives-${{ github.run_number }}
+          path: archives/*.csv
+          retention-days: 90
+
+      - name: Cleanup old posts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          CLEANUP_MONTHS: ${{ github.event.inputs.cleanup_months || '6' }}
+        run: |
+          echo "=== 데이터 정리 시작 ==="
+          python scripts/cleanup_old_posts.py
+
+      - name: Check final capacity
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          echo "=== 최종 용량 확인 ==="
+          python scripts/check_db_capacity.py
+
+      - name: Create summary
+        run: |
+          echo "## 데이터베이스 유지보수 완료 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 아카이브 파일이 Artifacts에 업로드되었습니다" >> $GITHUB_STEP_SUMMARY
+          echo "- 보관 기간: 90일" >> $GITHUB_STEP_SUMMARY
+          echo "- 실행 시간: $(date)" >> $GITHUB_STEP_SUMMARY
